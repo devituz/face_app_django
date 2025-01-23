@@ -1,0 +1,4 @@
+/.idea
+/venv
+/uploads
+db.sqlite3
