@@ -67,7 +67,9 @@ MIDDLEWARE = [
 ]
 
 CORS_ALLOWED_ORIGINS = [
-    'https://pdr.newuu.uz',
+     "http://127.0.0.1:4000",
+    "http://localhost:4000",
+    "https://yourdomain.com",
 ]
 
 CORS_ALLOW_ALL_ORIGINS = True

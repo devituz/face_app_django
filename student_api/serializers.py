@@ -6,11 +6,11 @@ from student_api.models import Students, SearchRecord
 class StudentsSerializer(serializers.ModelSerializer):
     class Meta:
         model = Students
-        fields = ['id', 'name', 'image_path', 'scan_id']
+        fields = ['id', 'name', 'image_path', 'scan_id','created_at','identifier']
 
 
 class SearchRecordSerializer(serializers.ModelSerializer):
-    student_name = serializers.CharField(source='student.name', read_only=True)  # Talabaning ismini ko'rsatish
+    student_name = serializers.CharField(source='student.name', read_only=True)
 
     class Meta:
         model = SearchRecord

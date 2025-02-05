@@ -1,4 +1,6 @@
 import os
+
+from django.http import JsonResponse
 from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
@@ -8,12 +10,21 @@ import face_recognition
 from PIL import Image, ExifTags
 import time
 from .serializers import StudentsSerializer, SearchRecordSerializer
-
+from django.utils.timezone import localtime
+import pytz
+import json
+from datetime import datetime
 
 @api_view(['POST'])
 def upload_image(request):
     name = request.data.get('name')
+    identifier = request.data.get('identifier')  # Foydalanuvchi kiritgan ID
     image_url = request.FILES.get('image_url')
+
+
+    if Students.objects.filter(identifier=identifier).exists():
+        return Response({"detail": "This identifier exists"}, status=status.HTTP_400_BAD_REQUEST)
+
 
     if not image_url:
         return Response({"detail": "Fayl berilmagan"}, status=status.HTTP_400_BAD_REQUEST)
@@ -36,51 +47,63 @@ def upload_image(request):
 
     face_encoding = face_encodings[0].tolist()
 
-    # Talaba ma'lumotlarini saqlash
-    new_student = Students(name=name, image_path=file_location, face_encoding=face_encoding)
+    new_student = Students(
+        name=name,
+        identifier=identifier,
+        image_path=file_location,
+        face_encoding=face_encoding
+    )
     new_student.save()
 
-    return Response({"message": "Rasm yuklandi va yuz saqlandi", "student_id": new_student.id})
+    return Response({
+        "message": "Image loaded and face saved",
+        "student_id": new_student.id,
+        "identifier": identifier
+    })
 
 
 @api_view(['POST'])
 def update_image(request, id):
     name = request.data.get('name')
-    file = request.FILES.get('file')
+    image_url = request.FILES.get('image_url')
+
+    # Kamida bittasi kiritilganligini tekshirish
+    if not name and not image_url:
+        return Response({"detail": "Iltimos, kamida bitta parametr yuboring: name yoki image_url."}, status=status.HTTP_400_BAD_REQUEST)
 
     # Berilgan ID bo‘yicha yozuvni qidirish
     existing_image = Students.objects.filter(id=id).first()
     if not existing_image:
         return Response({"detail": "Yozuv topilmadi"}, status=status.HTTP_404_NOT_FOUND)
 
-    # Faylni saqlash
-    file_location = os.path.join(settings.MEDIA_ROOT, 'uploads', file.name)
-    os.makedirs(os.path.dirname(file_location), exist_ok=True)
-    with open(file_location, "wb") as buffer:
-        for chunk in file.chunks():
-            buffer.write(chunk)
+    # Faylni saqlash agar image_url yuborilgan bo'lsa
+    if image_url:
+        file_location = os.path.join(settings.MEDIA_ROOT, 'uploads', image_url.name)
+        os.makedirs(os.path.dirname(file_location), exist_ok=True)
+        with open(file_location, "wb") as buffer:
+            for chunk in image_url.chunks():
+                buffer.write(chunk)
 
-    # Yuzni aniqlash
-    image = face_recognition.load_image_file(file_location)
-    face_encodings = face_recognition.face_encodings(image)
+        # Yuzni aniqlash
+        image = face_recognition.load_image_file(file_location)
+        face_encodings = face_recognition.face_encodings(image)
 
-    if len(face_encodings) == 0:
-        return Response({"detail": "Yuz aniqlanmadi"}, status=status.HTTP_400_BAD_REQUEST)
+        if len(face_encodings) == 0:
+            return Response({"detail": "Yuz aniqlanmadi"}, status=status.HTTP_400_BAD_REQUEST)
 
-    face_encoding = face_encodings[0].tolist()
+        face_encoding = face_encodings[0].tolist()
 
-    # Ma'lumotlarni yangilash
-    existing_image.name = name
-    existing_image.image_path = file_location
-    existing_image.face_encoding = face_encoding
+        # Rasm va yuzni yangilash
+        existing_image.image_path = file_location
+        existing_image.face_encoding = face_encoding
+
+    # Agar name yuborilgan bo'lsa, yangilash
+    if name:
+        existing_image.name = name
+
     existing_image.save()
 
-    return Response({"message": "Rasm yangilandi va yuz saqlandi", "student_id": existing_image.id})
-
-
-
-
-
+    return Response({"message": "Ma'lumotlar yangilandi", "student_id": existing_image.id})
 
 
 
@@ -169,11 +192,12 @@ def search_image(request):
         "search_duration_seconds": round(search_duration, 2)  # Qidiruv davomiyligini yuborish
     })
 
-
 @api_view(['GET'])
 def get_user_images(request):
     students = Students.objects.all()
     serializer = StudentsSerializer(students, many=True)
+
+    uzbekistan_tz = pytz.timezone("Asia/Tashkent")
 
     # JSON formatini o'zgartirish
     for student in serializer.data:
@@ -184,14 +208,19 @@ def get_user_images(request):
         # image_path ni olib tashlash
         del student['image_path']
 
+        if 'created_at' in student:
+            utc_time = datetime.strptime(student['created_at'], "%Y-%m-%dT%H:%M:%S.%fZ")  # UTC formatidan datetime ga
+            local_time = utc_time.replace(tzinfo=pytz.utc).astimezone(uzbekistan_tz)  # UTC dan O‘zbekiston vaqtiga
+            student['created_at'] = local_time.strftime(
+                "%b %d, %Y %H:%M:%S")  # "Jan 29, 2025 11:29:24" formatiga o‘tkazish
+
     return Response({"students": serializer.data})
 
 
 
-@api_view(['GET'])
 def allsearch(request):
-    # SearchRecord dan barcha yozuvlarni olish
-    search_records = SearchRecord.objects.select_related('student').all()
+    # SearchRecord dan barcha yozuvlarni olish va created_at bo‘yicha teskari saralash
+    search_records = SearchRecord.objects.select_related('student').order_by('-created_at')
 
     # JSON formatiga moslashtirish
     data = []
@@ -199,6 +228,8 @@ def allsearch(request):
         student = {
             "id": record.student.id if record.student else None,
             "name": record.student.name if record.student else None,
+            "identifier": record.student.identifier if record.student else None,
+            "created_at": record.student.created_at if record.student else None,
         }
 
         # Agar student mavjud bo'lsa, image_path ni ishlatib image_url ni yaratish
@@ -219,7 +250,7 @@ def allsearch(request):
         })
 
     # JSON formatida javob qaytarish
-    return Response({"search_records": data})
+    return JsonResponse({"search_records": data}, safe=False)
 
 
 @api_view(['POST'])
@@ -254,41 +285,47 @@ def getme_register(request):
 
 
 @api_view(['POST'])
-def delete_records_by_scan_id(request):
-    # Yuborilgan scan_ids ro‘yxatini olish
-    scan_ids = request.data.get('scan_ids', [])
+def delete_records_by_id(request):
+    # Yuborilgan id larni olish
+    record_ids = request.data.get('ids', [])
 
-    if not scan_ids:
-        return Response({"detail": "Scan ID'lar berilmagan"}, status=status.HTTP_400_BAD_REQUEST)
+    if not record_ids:
+        return Response({"detail": "ID'lar berilmagan"}, status=status.HTTP_400_BAD_REQUEST)
 
     deleted_count = 0
 
-    # Har bir scan_id bo‘yicha tegishli barcha SearchRecord yozuvlarini qidirish va o‘chirish
-    for scan_id in scan_ids:
-        # scan_id ga mos barcha yozuvlarni o‘chirish
-        records_to_delete = SearchRecord.objects.filter(scan_id=scan_id)
-        count = records_to_delete.count()
-        records_to_delete.delete()
-        deleted_count += count
+    # Har bir ID bo‘yicha SearchRecord dan yozuvlarni topish va o‘chirish
+    for record_id in record_ids:
+        try:
+            record = SearchRecord.objects.get(id=record_id)  # ID bo‘yicha qidirish
+            record.delete()  # Agar topilsa, o‘chirish
+            deleted_count += 1
+        except SearchRecord.DoesNotExist:
+            continue  # ID topilmasa, davom etadi
 
     if deleted_count == 0:
-        return Response({"detail": "Berilgan scan_id bo‘yicha yozuvlar topilmadi"}, status=status.HTTP_404_NOT_FOUND)
+        return Response({"detail": "Berilgan ID bo‘yicha yozuvlar topilmadi"}, status=status.HTTP_404_NOT_FOUND)
 
     return Response({"message": f"{deleted_count} ta yozuv muvaffaqiyatli o‘chirildi"})
 
+
 @api_view(['POST'])
 def delete_candidate_records(request):
-    candidate_ids = request.data.get('candidate_ids', [])
+    # 'ids' ni olish
+    ids = request.data.get('ids', [])
 
-    if not isinstance(candidate_ids, list) or not candidate_ids:
-        return Response({"detail": "candidate_ids massivda berilishi kerak"}, status=status.HTTP_400_BAD_REQUEST)
+    # 'ids' massiv ekanini tekshirish
+    if not isinstance(ids, list) or not ids:
+        return Response({"detail": "ids massivda berilishi kerak"}, status=status.HTTP_400_BAD_REQUEST)
 
-    students_to_delete = Students.objects.filter(id__in=candidate_ids)
+    # IDs bo'yicha o'chirilishi kerak bo'lgan studentlarni topish
+    students_to_delete = Students.objects.filter(id__in=ids)
     deleted_count = students_to_delete.count()
 
     if deleted_count == 0:
         return Response({"detail": "Hech qanday mos Kandidat topilmadi"}, status=status.HTTP_404_NOT_FOUND)
 
+    # O'chirish jarayoni
     students_to_delete.delete()
     return Response({"message": f"{deleted_count} ta kandidat muvaffaqiyatli o'chirildi"})
 
