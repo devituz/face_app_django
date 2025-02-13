@@ -109,21 +109,16 @@ def update_image(request, id):
 
 @api_view(['POST'])
 def search_image(request):
-    # So'rov boshlanish vaqtini olish
-    start_time = time.time()
-
     file = request.FILES.get('file')
     scan_id = request.data.get('scan_id')
     search_folder = os.path.join(settings.MEDIA_ROOT, 'searches')
     os.makedirs(search_folder, exist_ok=True)
     file_location = os.path.join(search_folder, file.name)
 
-    # Rasmni serverga saqlash
     with open(file_location, "wb") as buffer:
         for chunk in file.chunks():
             buffer.write(chunk)
 
-    # EXIF ma'lumotlarini tekshirish va rasmni burish (rotatsiya qilish)
     image = Image.open(file_location)
     try:
         exif = image._getexif()
@@ -136,13 +131,10 @@ def search_image(request):
                         image = image.rotate(270, expand=True)
                     elif value == 8:
                         image = image.rotate(90, expand=True)
-        # Rasmni yangilash
         image.save(file_location)
     except (AttributeError, KeyError, IndexError):
-        # EXIF ma'lumotlari mavjud emas bo'lsa, bu xatoliklarni e'tiborsiz qoldirish
         pass
 
-    # Rasmda yuzlarni aniqlash
     search_image = face_recognition.load_image_file(file_location)
     search_face_encodings = face_recognition.face_encodings(search_image)
 
@@ -152,45 +144,38 @@ def search_image(request):
     search_face_encoding = search_face_encodings[0]
     students = Students.objects.all()
 
-    # Talabalar bilan moslikni tekshirish
     for student in students:
         match = face_recognition.compare_faces([student.face_encoding], search_face_encoding, tolerance=0.4)
         if match[0]:
             student.scan_id = scan_id
             student.save()
 
-            # Faqat mos talaba topilganida SearchRecord saqlanadi.
-            SearchRecord.objects.create(
+            # SearchRecord obyektini yaratamiz va o‘zgaruvchiga saqlaymiz
+            search_record = SearchRecord.objects.create(
                 search_image_path=file_location,
-                student_id=student.id,  # student ID sini uzatish
+                student_id=student.id,
                 scan_id=scan_id
             )
 
             file_name = student.image_path.split("/")[-1]
             file_url = request.build_absolute_uri(f"{settings.MEDIA_URL}students/{file_name}")
+            created_at_uz = localtime(search_record.created_at).strftime("%Y-%m-%d %H:%M:%S")
 
-            # Qidiruv davomiyligini hisoblash
-            end_time = time.time()  # Javob yuborish vaqti
-            search_duration = end_time - start_time  # Tugash vaqti - boshlanish vaqti
-            name_with_duration = f"{student.name} vaqti - {round(search_duration, 2)}"
 
             return Response({
                 "message": "Yuz topildi",
                 "id": student.id,
-                "name": name_with_duration,
+                "name": student.name,
+                "identifier": student.identifier,
                 "scan_id": scan_id,
                 "file": file_url,
-                "search_duration_seconds": round(search_duration, 2)  # Qidiruv davomiyligini yuborish
+                "created_at": created_at_uz,  # ✅ O‘zbekiston vaqti bo‘yicha qaytariladi
             })
-
-    # Agar mos talaba topilmasa, SearchRecord saqlanmaydi
-    end_time = time.time()  # Javob yuborish vaqti
-    search_duration = end_time - start_time  # Tugash vaqti - boshlanish vaqti
 
     return Response({
         "detail": "Siz yuborgan rasmda inson yuzilari bilan mos kelmadi",
-        "search_duration_seconds": round(search_duration, 2)  # Qidiruv davomiyligini yuborish
     })
+
 
 @api_view(['GET'])
 def get_user_images(request):
@@ -208,11 +193,17 @@ def get_user_images(request):
         # image_path ni olib tashlash
         del student['image_path']
 
+        # `created_at` bo'lsa, uni O‘zbekiston vaqtiga aylantiramiz
         if 'created_at' in student:
-            utc_time = datetime.strptime(student['created_at'], "%Y-%m-%dT%H:%M:%S.%fZ")  # UTC formatidan datetime ga
-            local_time = utc_time.replace(tzinfo=pytz.utc).astimezone(uzbekistan_tz)  # UTC dan O‘zbekiston vaqtiga
-            student['created_at'] = local_time.strftime(
-                "%b %d, %Y %H:%M:%S")  # "Jan 29, 2025 11:29:24" formatiga o‘tkazish
+            try:
+                # `created_at` string ko‘rinishida kelgan vaqtni datetime obyektiga o‘tkazish
+                utc_time = datetime.fromisoformat(student['created_at'])  # ISO 8601 formatini avtomatik o‘qiydi
+                local_time = utc_time.astimezone(uzbekistan_tz)  # UTC dan O‘zbekiston vaqtiga o‘tkazish
+
+                # Yangi formatga o‘tkazish (Masalan: "Feb 13, 2025 12:30:45")
+                student['created_at'] = local_time.strftime("%b %d, %Y %H:%M:%S")
+            except ValueError:
+                pass  # Xatolik yuz bersa, shunchaki `created_at` o‘zgartirilmaydi
 
     return Response({"students": serializer.data})
 

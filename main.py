@@ -1,52 +1,65 @@
-import time
-from instagrapi import Client
+import cv2
+import mediapipe as mp
+import numpy as np
 
+# Mediapipe Hand Tracking modelini chaqiramiz
+mp_hands = mp.solutions.hands
+mp_drawing = mp.solutions.drawing_utils
 
-username = "devit_uz"
-password = "s75S7xg6xi^fUZT"
+# Rasm chizish uchun bo'sh canvas
+canvas = np.zeros((480, 640, 3), dtype=np.uint8)
 
+# Kamera ochish
+cap = cv2.VideoCapture(0)
 
-def login_to_instagram():
+# Chizish rejimi
+drawing = False
+prev_x, prev_y = None, None
 
-    cl = Client()
-    cl.login(username, password)
-    return cl
+with mp_hands.Hands(min_detection_confidence=0.7, min_tracking_confidence=0.7, max_num_hands=1) as hands:
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            break
 
+        frame = cv2.flip(frame, 1)
+        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
+        # Mediapipe bilan kaftni aniqlash
+        result = hands.process(rgb_frame)
 
-cl = login_to_instagram()
+        if result.multi_hand_landmarks:
+            for hand_landmarks in result.multi_hand_landmarks:
+                # Qo‘l skeletini chizish
+                mp_drawing.draw_landmarks(frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
 
-post_url = "https://www.instagram.com/reel/DC5tgoRomPDvMxbt1-gz1VL9vxUXF2jFms9d_c0/"
-media_id = cl.media_id(cl.media_pk_from_url(post_url))
+                # Ko'rsatkich barmoq uchi koordinatalarini olish
+                h, w, _ = frame.shape
+                index_finger_tip = hand_landmarks.landmark[8]
+                x, y = int(index_finger_tip.x * w), int(index_finger_tip.y * h)
 
-comments = [
-    "🇮🇳 Raja Kumar Oshiqbaxsh – har bir gapida “jonim” deb gapiradigan, lekin hech kim uni jiddiy qabul qilmaydigan yigit 💘😂",
-    "🇮🇳 Sulton G‘o‘r – har bir gapini “bilaman” deb boshlaydi, lekin hayotda bir marta ham amalda ishlatmagan 🤓🤣",
-    "🇮🇳 Raja Kumar Jo‘nashga Tayyormi? – '5 minutda chiqaman' deb, so‘ng 2 soat oynak oldida turgan shahzoda ⏳👑😂",
-    "🇮🇳 Maharaja Gap Yoqmaydi – odamlarning gapini tinglashga toqati yo‘q, lekin o‘zi gap boshlasa, hamma eshitishi shart deb o‘ylaydi 🙉😆",
-    "🇮🇳 Raja Kumar “Kelishgan” – o‘zini juda chiroyli deb hisoblaydi, lekin hamma uni kulgili deb o‘ylaydi 😎😂",
-    "🇮🇳 Sulton Matematika – 2x2=5 deb o‘ylaydigan, lekin biznes boshlashni xohlovchi shahzoda 📊🤣",
-    "🇮🇳 Maharaja “Bu Kim?” – har safar yangi odam bilan tanishib, 10 daqiqada esdan chiqaradigan yigit 🤔😅",
-    "🇮🇳 Raja Kumar Selfiboz – har joyda selfi tushib, keyin 'men tabiatni his qilyapman' deb yozadigan shahzoda 📸😆",
-    "🇮🇳 Sulton Suhbatdosh – hech kim unga savol bermasa ham, o‘zining hayot tarixini soatlab gapirib beradigan yigit 🎤😂",
-    "🇮🇳 Raja Kumar Hamma Biladi – nima haqida gap bo‘lsa ham, o‘sha mavzuda mutaxassisdek gapiradigan, lekin hech qanday dalil ko‘rsatmaydigan yigit 🙄🤣",
-] * 10  # 10 martadan yozish
+                # Agar barmoq birinchi marta aniqlansa
+                if prev_x is None or prev_y is None:
+                    prev_x, prev_y = x, y
 
+                # Agar barmoqni bosib turgan bo‘lsak (chizish rejimi)
+                if drawing:
+                    cv2.line(canvas, (prev_x, prev_y), (x, y), (255, 0, 0), 5)
+                
+                prev_x, prev_y = x, y
 
+        # Rasm va chizilgan narsalarni birlashtirish
+        frame = cv2.addWeighted(frame, 0.5, canvas, 0.5, 0)
 
-for i, comment in enumerate(comments, start=1):
-    try:
-        cl.media_comment(media_id, comment)
-        print(f"{i}-chi izoh muvaffaqiyatli qoldirildi: {comment}")
-    except Exception as e:
-        print(f"{i}-chi izohni qoldirishda xatolik yuz berdi: {e}")
+        cv2.imshow("Qo'l harakati bilan chizish", frame)
 
+        key = cv2.waitKey(1) & 0xFF
+        if key == ord("q"):  # Chiqish
+            break
+        elif key == ord("d"):  # Chizish rejimini yoqish/o‘chirish
+            drawing = not drawing
+        elif key == ord("c"):  # Canvasni tozalash
+            canvas[:] = 0
 
-    time.sleep(10)
-
-
-    if i % 35 == 0:
-        print("35 ta izohdan keyin yangi login amalga oshirilyapti...")
-        cl = login_to_instagram()
-
-print("Barcha izohlar muvaffaqiyatli qoldirildi!")
+cap.release()
+cv2.destroyAllWindows()

@@ -2,7 +2,7 @@ from django.db import models
 
 class Students(models.Model):
     name = models.CharField(max_length=255)
-    identifier = models.CharField(max_length=255, null=True, blank=True)  # NULL ga ruxsat berildi
+    identifier = models.CharField(max_length=255, null=True, blank=True)
     image_path = models.CharField(max_length=255)
     face_encoding = models.JSONField()
     scan_id = models.CharField(max_length=255, null=True, blank=True)

@@ -152,7 +152,8 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'uploads')
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Asia/Tashkent'
+
 
 USE_I18N = True
 
