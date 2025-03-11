@@ -11,7 +11,7 @@ source_directory = 'rasmlar/img_align_celeba'  # Rasm fayllar manzili (relative 
 target_directory = 'uploads/students'  # Faqat relative yo'l
 
 # To'liq manzilni qo'shish
-base_directory = '/home/user/loyiha/ai_app/'  # Loyihaning asosiy manzili
+base_directory = '/home/user/loyiha/face_app_django/'  # Loyihaning asosiy manzili
 
 # Flag fayli
 flag_file = 'processing_flag.txt'
