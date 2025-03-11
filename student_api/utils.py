@@ -3,16 +3,34 @@ import face_recognition
 import shutil
 from django.conf import settings
 from student_api.models import Students
+import random
+import string
 
 # Fayllar manzillari
-source_directory = 'rasmlar'  # Rasm fayllar manzili (relative yo'l)
+source_directory = 'rasmlar/img_align_celeba'  # Rasm fayllar manzili (relative yo'l)
 target_directory = 'uploads/students'  # Faqat relative yo'l
 
 # To'liq manzilni qo'shish
-base_directory = '/home/user/loyiha/ai_university/ai_app/'  # Loyihaning asosiy manzili
+base_directory = '/home/user/loyiha/ai_app/'  # Loyihaning asosiy manzili
 
 # Flag fayli
 flag_file = 'processing_flag.txt'
+
+
+
+
+def generate_unique_identifier():
+    """ Unikal identifier yaratish (AA12345678 formati) """
+    while True:
+        identifier = (
+            random.choice(string.ascii_uppercase) + random.choice(string.ascii_uppercase) +
+            "".join(random.choices(string.digits, k=8))
+        )
+
+        # Takrorlanmasligini tekshiramiz
+        if not Students.objects.filter(identifier=identifier).exists():
+            return identifier
+
 
 
 # Talaba rasmlarini qayta ishlash va saqlash
@@ -61,8 +79,11 @@ def process_and_save_student_images():
                         full_target_path = os.path.join(base_directory, target_directory, image_file).replace(os.sep,
                                                                                                               '/')
 
+
+                        student_identifier = generate_unique_identifier()
+
                         # Yangi talaba ob'ektini yaratish
-                        new_student = Students(name=student_name, image_path=full_target_path,
+                        new_student = Students(name=student_name, identifier=student_identifier, image_path=full_target_path,
                                                face_encoding=face_encoding)
 
                         # Talabani bazaga qo'shish
