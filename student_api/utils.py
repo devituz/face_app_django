@@ -11,12 +11,11 @@ source_directory = 'rasmlar/img_align_celeba'  # Rasm fayllar manzili (relative 
 target_directory = 'uploads/students'  # Faqat relative yo'l
 
 # To'liq manzilni qo'shish
-base_directory = '/home/user/loyiha/face_app_django/'  # Loyihaning asosiy manzili
+base_directory = '/home/user/loyiha/face_app_django'  # Loyihaning asosiy manzili
 
 # Flag fayli
 flag_file = 'processing_flag.txt'
-
-
+MAX_IMAGES = 202500
 
 
 def generate_unique_identifier():
@@ -55,6 +54,9 @@ def process_and_save_student_images():
             # Faylni faqat rasm bo'lsa ishlatish
             if os.path.isfile(file_path) and image_file.lower().endswith(('jpg', 'jpeg', 'png')):
                 total_images += 1
+                if total_images >= MAX_IMAGES:
+                    print("Maksimal rasm soniga yetdi. Dastur to'xtatildi.")
+                    break
 
                 try:
                     # Fayl nomidan talaba ismini olish (fayl kengaytmasiz)
