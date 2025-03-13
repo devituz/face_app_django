@@ -181,7 +181,7 @@ def search_image(request):
 
 
 class StudentsPagination(PageNumberPagination):
-    page_size = 9  # Har bir sahifada 9 ta foydalanuvchi
+    page_size = 10  # Har bir sahifada 9 ta foydalanuvchi
 
 @api_view(['GET'])
 def get_user_images(request):

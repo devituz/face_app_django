@@ -59,7 +59,7 @@ JAZZMIN_SETTINGS = {
 # settings.py faylida
 REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 9,  # Har bir sahifada 10ta foydalanuvchi
+    'PAGE_SIZE': 10,  # Har bir sahifada 10ta foydalanuvchi
 }
 
 
