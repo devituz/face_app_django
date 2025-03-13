@@ -14,9 +14,6 @@ from django.utils.timezone import localtime
 import pytz
 import json
 from datetime import datetime
-from rest_framework.pagination import PageNumberPagination
-
-
 
 @api_view(['POST'])
 def upload_image(request):
@@ -180,16 +177,10 @@ def search_image(request):
     })
 
 
-class StudentsPagination(PageNumberPagination):
-    page_size = 10  # Har bir sahifada 10ta foydalanuvchi
-
-
 @api_view(['GET'])
 def get_user_images(request):
     students = Students.objects.all()
-    paginator = StudentsPagination()
-    result_page = paginator.paginate_queryset(students, request)
-    serializer = StudentsSerializer(result_page, many=True)
+    serializer = StudentsSerializer(students, many=True)
 
     uzbekistan_tz = pytz.timezone("Asia/Tashkent")
 
@@ -214,9 +205,7 @@ def get_user_images(request):
             except ValueError:
                 pass  # Xatolik yuz bersa, shunchaki `created_at` o‘zgartirilmaydi
 
-    return paginator.get_paginated_response(serializer.data)
-
-
+    return Response({"students": serializer.data})
 
 
 
