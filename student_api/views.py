@@ -181,19 +181,7 @@ def search_image(request):
 
 
 class StudentsPagination(PageNumberPagination):
-    page_size = 10  # Sahifada nechta element bo'lishini belgilash
-    page_size_query_param = 'page_size'
-    max_page_size_query_param = 'max_page_size'
-
-    def get_max_page_size(self, request):
-        try:
-            return int(request.query_params.get(self.max_page_size_query_param, 100))
-        except ValueError:
-            return 100
-
-    def get_page_size(self, request):
-        max_size = self.get_max_page_size(request)
-        return min(super().get_page_size(request), max_size)
+    page_size = 10  # Har bir sahifada 9 ta foydalanuvchi
 
 @api_view(['GET'])
 def get_user_images(request):
@@ -216,19 +204,16 @@ def get_user_images(request):
         # `created_at` bo'lsa, uni O‘zbekiston vaqtiga aylantiramiz
         if 'created_at' in student:
             try:
+                # `created_at` string ko‘rinishida kelgan vaqtni datetime obyektiga o‘tkazish
                 utc_time = datetime.fromisoformat(student['created_at'])  # ISO 8601 formatini avtomatik o‘qiydi
                 local_time = utc_time.astimezone(uzbekistan_tz)  # UTC dan O‘zbekiston vaqtiga o‘tkazish
+
+                # Yangi formatga o‘tkazish (Masalan: "Feb 13, 2025 12:30:45")
                 student['created_at'] = local_time.strftime("%b %d, %Y %H:%M:%S")
             except ValueError:
                 pass  # Xatolik yuz bersa, shunchaki `created_at` o‘zgartirilmaydi
 
-    return paginator.get_paginated_response({
-        "students": serializer.data,
-        "count": paginator.page.paginator.count,
-        "total_pages": paginator.page.paginator.num_pages,
-        "next": paginator.get_next_link(),
-        "previous": paginator.get_previous_link()
-    })
+    return Response({"students": serializer.data})
 
 def allsearch(request):
     # SearchRecord dan barcha yozuvlarni olish va created_at bo‘yicha teskari saralash
