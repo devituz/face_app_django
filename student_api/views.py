@@ -1,5 +1,5 @@
 import os
-
+from urllib.parse import urlencode
 from django.http import JsonResponse
 from rest_framework import status
 from rest_framework.decorators import api_view
@@ -181,7 +181,7 @@ def search_image(request):
 
 
 class StudentsPagination(PageNumberPagination):
-    page_size = 10  # Har bir sahifada 9 ta foydalanuvchi
+    page_size = 10  # Har bir sahifada 10 ta foydalanuvchi
 
 @api_view(['GET'])
 def get_user_images(request):
@@ -201,19 +201,38 @@ def get_user_images(request):
         # image_path ni olib tashlash
         del student['image_path']
 
-        # `created_at` bo'lsa, uni O‘zbekiston vaqtiga aylantiramiz
+        # `created_at` ni O‘zbekiston vaqtiga o‘tkazish
         if 'created_at' in student:
             try:
-                # `created_at` string ko‘rinishida kelgan vaqtni datetime obyektiga o‘tkazish
-                utc_time = datetime.fromisoformat(student['created_at'])  # ISO 8601 formatini avtomatik o‘qiydi
-                local_time = utc_time.astimezone(uzbekistan_tz)  # UTC dan O‘zbekiston vaqtiga o‘tkazish
-
-                # Yangi formatga o‘tkazish (Masalan: "Feb 13, 2025 12:30:45")
+                utc_time = datetime.fromisoformat(student['created_at'])
+                local_time = utc_time.astimezone(uzbekistan_tz)
                 student['created_at'] = local_time.strftime("%b %d, %Y %H:%M:%S")
             except ValueError:
-                pass  # Xatolik yuz bersa, shunchaki `created_at` o‘zgartirilmaydi
+                pass  # Xatolik bo‘lsa, `created_at` o‘zgartirilmaydi
 
-    return Response({"students": serializer.data})
+    # Joriy sahifa va umumiy sahifalar soni
+    current_page = request.query_params.get(paginator.page_query_param, 1)
+    total_pages = paginator.page.paginator.num_pages
+
+    # Prev va Next URL'larini hosil qilish
+    base_url = request.build_absolute_uri(request.path)
+    prev_page = None
+    next_page = None
+
+    if paginator.page.has_previous():
+        prev_params = {paginator.page_query_param: paginator.page.previous_page_number()}
+        prev_page = f"{base_url}?{urlencode(prev_params)}"
+
+    if paginator.page.has_next():
+        next_params = {paginator.page_query_param: paginator.page.next_page_number()}
+        next_page = f"{base_url}?{urlencode(next_params)}"
+
+    return Response({
+        "totalPages": total_pages,
+        "Prev": prev_page,
+        "Next": next_page,
+        "students": serializer.data
+    })
 
 def allsearch(request):
     # SearchRecord dan barcha yozuvlarni olish va created_at bo‘yicha teskari saralash
