@@ -55,6 +55,14 @@ JAZZMIN_SETTINGS = {
     # 'custom_js': 'js/custom.js',      # Path to your custom JS file
 }
 
+
+# settings.py faylida
+REST_FRAMEWORK = {
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 10,  # Har bir sahifada 10ta foydalanuvchi
+}
+
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'corsheaders.middleware.CorsMiddleware',
