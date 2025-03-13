@@ -1,0 +1,12 @@
+{
+    "students": [
+        {
+            "id": 1,
+            "name": "173521",
+            "scan_id": null,
+            "created_at": "Mar 12, 2025 11:06:15",
+            "identifier": "WO63178615",
+            "image_url": "http://172.24.25.141:5000/uploads/students/173521.jpg"
+        }
+    ]
+}

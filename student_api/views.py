@@ -3,6 +3,7 @@ import os
 from django.http import JsonResponse
 from rest_framework import status
 from rest_framework.decorators import api_view
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from django.conf import settings
 from .models import Students, SearchRecord
@@ -177,10 +178,17 @@ def search_image(request):
     })
 
 
+
+
+class StudentsPagination(PageNumberPagination):
+    page_size = 9  # Har bir sahifada 9 ta foydalanuvchi
+
 @api_view(['GET'])
 def get_user_images(request):
     students = Students.objects.all()
-    serializer = StudentsSerializer(students, many=True)
+    paginator = StudentsPagination()
+    result_page = paginator.paginate_queryset(students, request)
+    serializer = StudentsSerializer(result_page, many=True)
 
     uzbekistan_tz = pytz.timezone("Asia/Tashkent")
 
@@ -206,8 +214,6 @@ def get_user_images(request):
                 pass  # Xatolik yuz bersa, shunchaki `created_at` o‘zgartirilmaydi
 
     return Response({"students": serializer.data})
-
-
 
 def allsearch(request):
     # SearchRecord dan barcha yozuvlarni olish va created_at bo‘yicha teskari saralash
