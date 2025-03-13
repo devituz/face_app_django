@@ -3,6 +3,7 @@ import os
 from django.http import JsonResponse
 from rest_framework import status
 from rest_framework.decorators import api_view
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from django.conf import settings
 from .models import Students, SearchRecord
@@ -14,11 +15,6 @@ from django.utils.timezone import localtime
 import pytz
 import json
 from datetime import datetime
-from django.views.decorators.cache import cache_page
-from django.core.cache import cache
-uzbekistan_tz = pytz.timezone("Asia/Tashkent")
-
-
 
 @api_view(['POST'])
 def upload_image(request):
@@ -182,35 +178,40 @@ def search_image(request):
     })
 
 
+class StudentsPagination(PageNumberPagination):
+    page_size = 10  # Har bir sahifada 9 ta foydalanuvchi
+
 @api_view(['GET'])
-@cache_page(120)  # 2 daqiqa (120 sekund) cache
 def get_user_images(request):
-    cache_key = "user_images"  # Unikal cache key
-
-    cached_data = cache.get(cache_key)  # Cache dan olish
-    if cached_data:
-        return Response(cached_data)  # Agar cache mavjud bo‘lsa, shuni qaytaradi
-
     students = Students.objects.all()
-    serializer = StudentsSerializer(students, many=True)
+    paginator = StudentsPagination()
+    result_page = paginator.paginate_queryset(students, request)
+    serializer = StudentsSerializer(result_page, many=True)
 
+    uzbekistan_tz = pytz.timezone("Asia/Tashkent")
+
+    # JSON formatini o'zgartirish
     for student in serializer.data:
+        # Fayl URL'ini to'g'ri shaklga keltirish
         file_name = student['image_path'].split("/")[-1]  # Fayl nomini olish
         student['image_url'] = request.build_absolute_uri(f"{settings.MEDIA_URL}students/{file_name}")
-        del student['image_path']  # `image_path` ni olib tashlash
 
+        # image_path ni olib tashlash
+        del student['image_path']
+
+        # created_at bo'lsa, uni O‘zbekiston vaqtiga aylantiramiz
         if 'created_at' in student:
             try:
-                utc_time = datetime.fromisoformat(student['created_at'])
-                local_time = utc_time.astimezone(uzbekistan_tz)
+                # created_at string ko‘rinishida kelgan vaqtni datetime obyektiga o‘tkazish
+                utc_time = datetime.fromisoformat(student['created_at'])  # ISO 8601 formatini avtomatik o‘qiydi
+                local_time = utc_time.astimezone(uzbekistan_tz)  # UTC dan O‘zbekiston vaqtiga o‘tkazish
+
+                # Yangi formatga o‘tkazish (Masalan: "Feb 13, 2025 12:30:45")
                 student['created_at'] = local_time.strftime("%b %d, %Y %H:%M:%S")
             except ValueError:
-                pass
+                pass  # Xatolik yuz bersa, shunchaki created_at o‘zgartirilmaydi
 
-    response_data = {"students": serializer.data}
-
-    cache.set(cache_key, response_data, timeout=120)  # 2 daqiqa cache
-    return Response(response_data)
+    return Response({"students": serializer.data})
 
 
 
