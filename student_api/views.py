@@ -1,5 +1,5 @@
 import os
-
+from django.db.models import Q
 from django.http import JsonResponse
 from rest_framework import status
 from rest_framework.decorators import api_view
@@ -244,6 +244,43 @@ def get_user_json(request):
                 pass  # Xatolik yuz bersa, shunchaki `created_at` o‘zgartirilmaydi
 
     return Response({"students": serializer.data})
+
+
+@api_view(['GET'])
+def search_user_json(request):
+    query = request.GET.get('query', '').strip()
+
+    if not query:
+        return Response({})  # Agar query bo'sh bo'lsa, bo'sh obyekt qaytariladi
+
+    student = Students.objects.filter(
+        Q(name__icontains=query) | Q(identifier__icontains=query)
+    ).first()  # Faqat bitta natija qaytariladi
+
+    if not student:
+        return Response({})  # Agar topilmasa, bo'sh obyekt qaytariladi
+
+    serializer = StudentsSerializer(student)
+    student_data = serializer.data
+
+    # Fayl URL'ini to'g'ri shaklga keltirish
+    file_name = student_data['image_path'].split("/")[-1]
+    student_data['image_url'] = request.build_absolute_uri(f"{settings.MEDIA_URL}students/{file_name}")
+
+    # image_path ni olib tashlash
+    del student_data['image_path']
+
+    # `created_at`ni O‘zbekiston vaqtiga aylantirish
+    uzbekistan_tz = pytz.timezone("Asia/Tashkent")
+    if 'created_at' in student_data:
+        try:
+            utc_time = datetime.fromisoformat(student_data['created_at'])
+            local_time = utc_time.astimezone(uzbekistan_tz)
+            student_data['created_at'] = local_time.strftime("%b %d, %Y %H:%M:%S")
+        except ValueError:
+            pass
+
+    return Response(student_data)
 
 
 def allsearch(request):
