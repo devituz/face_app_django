@@ -215,6 +215,37 @@ def get_user_images(request):
 
 
 
+@api_view(['GET'])
+def get_user_json(request):
+    students = Students.objects.all()
+    serializer = StudentsSerializer(students, many=True)
+
+    uzbekistan_tz = pytz.timezone("Asia/Tashkent")
+
+    # JSON formatini o'zgartirish
+    for student in serializer.data:
+        # Fayl URL'ini to'g'ri shaklga keltirish
+        file_name = student['image_path'].split("/")[-1]  # Fayl nomini olish
+        student['image_url'] = request.build_absolute_uri(f"{settings.MEDIA_URL}students/{file_name}")
+
+        # image_path ni olib tashlash
+        del student['image_path']
+
+        # `created_at` bo'lsa, uni O‘zbekiston vaqtiga aylantiramiz
+        if 'created_at' in student:
+            try:
+                # `created_at` string ko‘rinishida kelgan vaqtni datetime obyektiga o‘tkazish
+                utc_time = datetime.fromisoformat(student['created_at'])  # ISO 8601 formatini avtomatik o‘qiydi
+                local_time = utc_time.astimezone(uzbekistan_tz)  # UTC dan O‘zbekiston vaqtiga o‘tkazish
+
+                # Yangi formatga o‘tkazish (Masalan: "Feb 13, 2025 12:30:45")
+                student['created_at'] = local_time.strftime("%b %d, %Y %H:%M:%S")
+            except ValueError:
+                pass  # Xatolik yuz bersa, shunchaki `created_at` o‘zgartirilmaydi
+
+    return Response({"students": serializer.data})
+
+
 def allsearch(request):
     # SearchRecord dan barcha yozuvlarni olish va created_at bo‘yicha teskari saralash
     search_records = SearchRecord.objects.select_related('student').order_by('-created_at')

@@ -13,6 +13,7 @@ urlpatterns = [
                   path('getme_register/', getme_register, name='getme_register'),
                   path('candidates/delete/', views.delete_candidate_records, name='delete_candidate_records'),
                   path('user_images/', views.get_user_images, name='get_user_images'),
+                  path('user_json/', views.get_user_json, name='get_user_json'),
                   path('user_delete/', views.delete_records_by_id, name='user_delete'),
               ] + static(settings.MEDIA_URL,
                          document_root=settings.MEDIA_ROOT)
