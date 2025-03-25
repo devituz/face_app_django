@@ -181,35 +181,38 @@ def search_image(request):
 class StudentsPagination(PageNumberPagination):
     page_size = 10  # Har bir sahifada 9 ta foydalanuvchi
 
+
 @api_view(['GET'])
 def get_user_images(request):
-    students = Students.objects.all()
+    # `created_at` bo‘yicha eng so‘nggilari birinchi chiqishi uchun saralash
+    students = Students.objects.all().order_by('-created_at')
+
     paginator = StudentsPagination()
     result_page = paginator.paginate_queryset(students, request)
     serializer = StudentsSerializer(result_page, many=True)
 
     uzbekistan_tz = pytz.timezone("Asia/Tashkent")
 
-    # JSON formatini o'zgartirish
+    # JSON formatini o‘zgartirish
     for student in serializer.data:
-        # Fayl URL'ini to'g'ri shaklga keltirish
+        # Fayl URL'ini to‘g‘ri shaklga keltirish
         file_name = student['image_path'].split("/")[-1]  # Fayl nomini olish
         student['image_url'] = request.build_absolute_uri(f"{settings.MEDIA_URL}students/{file_name}")
 
         # image_path ni olib tashlash
         del student['image_path']
 
-        # created_at bo'lsa, uni O‘zbekiston vaqtiga aylantiramiz
+        # `created_at` bo‘lsa, uni O‘zbekiston vaqtiga aylantiramiz
         if 'created_at' in student:
             try:
-                # created_at string ko‘rinishida kelgan vaqtni datetime obyektiga o‘tkazish
-                utc_time = datetime.fromisoformat(student['created_at'])  # ISO 8601 formatini avtomatik o‘qiydi
+                # `created_at` stringni datetime obyektiga aylantirish
+                utc_time = datetime.fromisoformat(student['created_at'])  # ISO formatni avtomatik o‘qiydi
                 local_time = utc_time.astimezone(uzbekistan_tz)  # UTC dan O‘zbekiston vaqtiga o‘tkazish
 
-                # Yangi formatga o‘tkazish (Masalan: "Feb 13, 2025 12:30:45")
+                # Yangi formatga o‘tkazish (Masalan: "Mar 25, 2025 14:45:30")
                 student['created_at'] = local_time.strftime("%b %d, %Y %H:%M:%S")
             except ValueError:
-                pass  # Xatolik yuz bersa, shunchaki created_at o‘zgartirilmaydi
+                pass  # Xatolik bo‘lsa, o‘zgartirishsiz qoldiramiz
 
     return Response({"students": serializer.data})
 
