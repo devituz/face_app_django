@@ -351,7 +351,7 @@ def getme_register(request):
         serialized_record = SearchRecordSerializer(record).data
 
         # student_image listini hosil qilish
-        student_images = [search_image_url, student_image_path]
+        student_images = [student_image_path,search_image_url]
         student_images = [img for img in student_images if img]  # None bo'lganlarini olib tashlaymiz
 
         # search_image_path ni olib tashlab, student_image ni qo'shamiz
