@@ -357,7 +357,6 @@ def getme_register(request):
         result.append({
             **serialized_record,  # Serializer ma'lumotlarini qo'shish
             "student_name": student.name if student else "Noma'lum",
-            "student_image_path": student_image_path,  # Student rasmi
             "student_image": student_images,  # Bitta list sifatida qaytarish
         })
 
