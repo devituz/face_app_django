@@ -354,8 +354,11 @@ def getme_register(request):
         student_images = [search_image_url, student_image_path]
         student_images = [img for img in student_images if img]  # None bo'lganlarini olib tashlaymiz
 
+        # search_image_path ni olib tashlab, student_image ni qo'shamiz
+        filtered_record = {key: value for key, value in serialized_record.items() if key != "search_image_path"}
+
         result.append({
-            **serialized_record,  # Serializer ma'lumotlarini qo'shish
+            **filtered_record,
             "student_name": student.name if student else "Noma'lum",
             "student_image": student_images,  # Bitta list sifatida qaytarish
         })
