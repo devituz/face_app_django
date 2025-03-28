@@ -1,8 +1,18 @@
-  {
-            "id": 4,
-            "name": "070745",
-            "scan_id": null,
-            "created_at": "Mar 12, 2025 11:06:15",
-            "identifier": "KT01375245",
-            "image_url": "http://172.24.25.141:5000/uploads/students/070745.jpg"
-  }
+{
+    "results": [
+        {
+            "id": 36,
+            "search_image_path": "http://facesec.newuu.uz/uploads/searches/CAP8703528283646949562.jpg",
+            "scan_id": "Shohbozbek Turgunov",
+            "student": 70769,
+          "student_image": [
+            "http://facesec.newuu.uz/uploads/searches/CAP8703528283646949562.jpg",
+            "http://facesec.newuu.uz/uploads/students/914244568.jpg"
+          ],
+            "student_name": "Farrukh Yuldashev",
+            "created_at": "27-Mar-2025 14:04",
+            "student_image_path": "http://facesec.newuu.uz/uploads/students/914244568.jpg"
+        },
+
+    ]
+}

@@ -350,11 +350,15 @@ def getme_register(request):
 
         serialized_record = SearchRecordSerializer(record).data
 
+        # student_image listini hosil qilish
+        student_images = [search_image_url, student_image_path]
+        student_images = [img for img in student_images if img]  # None bo'lganlarini olib tashlaymiz
+
         result.append({
             **serialized_record,  # Serializer ma'lumotlarini qo'shish
             "student_name": student.name if student else "Noma'lum",
             "student_image_path": student_image_path,  # Student rasmi
-            "search_image_path": search_image_url,  # Search rasmi
+            "student_image": student_images,  # Bitta list sifatida qaytarish
         })
 
     return Response({"results": result})
