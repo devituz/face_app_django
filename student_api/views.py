@@ -361,6 +361,8 @@ def getme_register(request):
             **filtered_record,
             "student_name": student.name if student else "Noma'lum",
             "student_image": student_images,  # Bitta list sifatida qaytarish
+            "identifier": record.student.identifier if record.student else None,
+
         })
 
     return Response({"results": result})
