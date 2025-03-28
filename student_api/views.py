@@ -325,7 +325,7 @@ def allsearch(request):
 def getme_register(request):
     scan_id = request.data.get('scan_id')
 
-    # Filter search records based on scan_id and order them by id in descending order
+    # scan_id bo‘yicha SearchRecordlarni olish, id bo‘yicha kamayish tartibida saralash
     search_records = SearchRecord.objects.filter(scan_id=scan_id).order_by('-id')
 
     if not search_records.exists():
@@ -333,20 +333,28 @@ def getme_register(request):
 
     result = []
 
-    # Gather required information for each SearchRecord
     for record in search_records:
         student = record.student
 
-        # Correcting the student_image_path
-        student_image_name = student.image_path.split("/")[-1]  # Only take the file name
-        student_image_path = request.build_absolute_uri(f"{settings.MEDIA_URL}students/{student_image_name}")
+        # Student image URL
+        student_image_path = None
+        if student and student.image_path:
+            student_image_name = student.image_path.split("/")[-1]
+            student_image_path = request.build_absolute_uri(f"{settings.MEDIA_URL}students/{student_image_name}")
+
+        # Search image URL
+        search_image_url = None
+        if record.search_image_path:
+            search_file_name = record.search_image_path.split("/")[-1]
+            search_image_url = request.build_absolute_uri(f"{settings.MEDIA_URL}searches/{search_file_name}")
 
         serialized_record = SearchRecordSerializer(record).data
 
         result.append({
-            **serialized_record,  # Include serialized record data
+            **serialized_record,  # Serializer ma'lumotlarini qo'shish
             "student_name": student.name if student else "Noma'lum",
-            "search_image_path": student_image_path,  # Set image_path from Students
+            "student_image_path": student_image_path,  # Student rasmi
+            "search_image_path": search_image_url,  # Search rasmi
         })
 
     return Response({"results": result})
