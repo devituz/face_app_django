@@ -293,7 +293,6 @@ def search_user_json(request):
 
     return Response(students_data)
 
-
 def allsearch(request):
     query = request.GET.get('query', None)  # 'query' parametrini olish
 
