@@ -249,41 +249,55 @@ def get_user_json(request):
     return Response({"students": serializer.data})
 
 
+from django.conf import settings
+from django.db.models import Q
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+import pytz
+from datetime import datetime
+from .models import Students
+from .serializers import StudentsSerializer
+
+
 @api_view(['GET'])
 def search_user_json(request):
     query = request.GET.get('query', '').strip()
 
     if not query:
-        return Response({})  # Agar query bo'sh bo'lsa, bo'sh obyekt qaytariladi
+        return Response([])  # Agar query bo'sh bo'lsa, bo'sh ro'yxat qaytariladi
 
-    student = Students.objects.filter(
+    # `query` ga mos keladigan barcha studentlarni olish
+    students = Students.objects.filter(
         Q(name__icontains=query) | Q(identifier__icontains=query)
-    ).first()  # Faqat bitta natija qaytariladi
+    )
 
-    if not student:
-        return Response({})  # Agar topilmasa, bo'sh obyekt qaytariladi
+    if not students.exists():
+        return Response([])  # Agar hech narsa topilmasa, bo'sh ro'yxat qaytariladi
 
-    serializer = StudentsSerializer(student)
-    student_data = serializer.data
+    serializer = StudentsSerializer(students, many=True)  # Ko'p obyektni serialize qilish
+    students_data = serializer.data
 
-    # Fayl URL'ini to'g'ri shaklga keltirish
-    file_name = student_data['image_path'].split("/")[-1]
-    student_data['image_url'] = request.build_absolute_uri(f"{settings.MEDIA_URL}students/{file_name}")
-
-    # image_path ni olib tashlash
-    del student_data['image_path']
-
-    # `created_at`ni O‘zbekiston vaqtiga aylantirish
+    # Ma'lumotlarni qayta ishlash
     uzbekistan_tz = pytz.timezone("Asia/Tashkent")
-    if 'created_at' in student_data:
-        try:
-            utc_time = datetime.fromisoformat(student_data['created_at'])
-            local_time = utc_time.astimezone(uzbekistan_tz)
-            student_data['created_at'] = local_time.strftime("%b %d, %Y %H:%M:%S")
-        except ValueError:
-            pass
 
-    return Response(student_data)
+    for student in students_data:
+        # Fayl URL'ini to'g'ri shaklga keltirish
+        file_name = student['image_path'].split("/")[-1]
+        student['image_url'] = request.build_absolute_uri(f"{settings.MEDIA_URL}students/{file_name}")
+
+        # image_path ni olib tashlash
+        del student['image_path']
+
+        # `created_at` ni O‘zbekiston vaqtiga o'zgartirish
+        if 'created_at' in student:
+            try:
+                utc_time = datetime.fromisoformat(student['created_at'])
+                local_time = utc_time.astimezone(uzbekistan_tz)
+                student['created_at'] = local_time.strftime("%b %d, %Y %H:%M:%S")
+            except ValueError:
+                pass
+
+    return Response(students_data)
 
 
 def allsearch(request):
