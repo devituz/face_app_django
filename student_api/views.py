@@ -8,6 +8,8 @@ from rest_framework.response import Response
 from django.conf import settings
 from .models import Students, SearchRecord
 import face_recognition
+from django.core.paginator import Paginator  # Bu importni qo'shing
+
 from PIL import Image, ExifTags
 import time
 from .serializers import StudentsSerializer, SearchRecordSerializer
