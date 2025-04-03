@@ -16,6 +16,7 @@ import pytz
 import json
 from datetime import datetime
 
+
 @api_view(['POST'])
 def upload_image(request):
     name = request.data.get('name')
@@ -249,14 +250,7 @@ def get_user_json(request):
     return Response({"students": serializer.data})
 
 
-from django.conf import settings
-from django.db.models import Q
-from rest_framework.decorators import api_view
-from rest_framework.response import Response
-import pytz
-from datetime import datetime
-from .models import Students
-from .serializers import StudentsSerializer
+
 
 
 @api_view(['GET'])
@@ -299,8 +293,11 @@ def search_user_json(request):
 
     return Response(students_data)
 
+
 def allsearch(request):
     query = request.GET.get('query', None)  # 'query' parametrini olish
+    page = int(request.GET.get('page', 1))  # Sahifa raqami (default: 1)
+    limit = int(request.GET.get('limit', 10))  # Sahifada nechta yozuv ko'rsatilishini belgilash (default: 10)
 
     # Agar query bo'lsa, faqat o'sha so'rovlar bilan ishlaymiz
     if query:
@@ -311,9 +308,13 @@ def allsearch(request):
         # Agar query bo'lmasa, barcha yozuvlarni olish
         search_records = SearchRecord.objects.select_related('student').order_by('-created_at')
 
+    # Pagination qo'llash
+    paginator = Paginator(search_records, limit)  # Paginationni yaratish
+    page_obj = paginator.get_page(page)  # Sahifani olish
+
     # JSON formatiga moslashtirish
     data = []
-    for record in search_records:
+    for record in page_obj:
         student = {
             "id": record.student.id if record.student else None,
             "name": record.student.name if record.student else None,
@@ -339,7 +340,17 @@ def allsearch(request):
         })
 
     # JSON formatida javob qaytarish
-    return JsonResponse({"search_records": data}, safe=False)
+    response_data = {
+        "search_records": data,
+        "pagination": {
+            "total": paginator.count,  # Umumiy natijalar soni
+            "total_pages": paginator.num_pages,  # Umumiy sahifalar soni
+            "current_page": page,  # Joriy sahifa
+            "limit": limit  # Sahifada nechta yozuv ko'rsatiladi
+        }
+    }
+
+    return JsonResponse(response_data)
 
 
 
