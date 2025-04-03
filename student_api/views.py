@@ -299,10 +299,17 @@ def search_user_json(request):
 
     return Response(students_data)
 
-
 def allsearch(request):
-    # SearchRecord dan barcha yozuvlarni olish va created_at bo‘yicha teskari saralash
-    search_records = SearchRecord.objects.select_related('student').order_by('-created_at')
+    query = request.GET.get('query', None)  # 'query' parametrini olish
+
+    # Agar query bo'lsa, faqat o'sha so'rovlar bilan ishlaymiz
+    if query:
+        search_records = SearchRecord.objects.select_related('student').filter(
+            student__name__icontains=query  # 'name' bo'yicha qidiruv
+        ).order_by('-created_at')
+    else:
+        # Agar query bo'lmasa, barcha yozuvlarni olish
+        search_records = SearchRecord.objects.select_related('student').order_by('-created_at')
 
     # JSON formatiga moslashtirish
     data = []
@@ -333,6 +340,7 @@ def allsearch(request):
 
     # JSON formatida javob qaytarish
     return JsonResponse({"search_records": data}, safe=False)
+
 
 
 @api_view(['POST'])
