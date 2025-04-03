@@ -344,12 +344,6 @@ def allsearch(request):
     # JSON formatida javob qaytarish
     response_data = {
         "search_records": data,
-        "pagination": {
-            "total": paginator.count,  # Umumiy natijalar soni
-            "total_pages": paginator.num_pages,  # Umumiy sahifalar soni
-            "current_page": page,  # Joriy sahifa
-            "limit": limit  # Sahifada nechta yozuv ko'rsatiladi
-        }
     }
 
     return JsonResponse(response_data)
