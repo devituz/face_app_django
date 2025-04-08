@@ -113,9 +113,10 @@ def update_image(request, id):
 def search_image(request):
     file = request.FILES.get('file')
     scan_id = request.data.get('scan_id')
+    file_name = file.name.replace(' ', '_')  # Fayl nomidagi bo‘shliqlarni almashtiradi
     search_folder = os.path.join(settings.MEDIA_ROOT, 'searches')
     os.makedirs(search_folder, exist_ok=True)
-    file_location = os.path.join(search_folder, file.name)
+    file_location = os.path.join(search_folder, file_name)
 
     with open(file_location, "wb") as buffer:
         for chunk in file.chunks():
