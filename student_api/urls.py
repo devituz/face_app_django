@@ -3,12 +3,14 @@ from django.conf.urls.static import static
 from django.urls import path
 from .views import upload_image, update_image, search_image,allsearch, get_user_images, getme_register
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-
-from . import views
+from .views import UserProfileView
 
 urlpatterns = [
                   path('api/login/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
                   path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+
+
+
                   path('upload/', views.upload_image, name='upload_image'),
                   path('upload/update/<int:id>/', views.update_image, name='update_image'),
                   path('search/', search_image, name='search_image'),
