@@ -1,4 +1,6 @@
 from rest_framework import serializers
+from django.contrib.auth.models import User
+
 
 from student_api.models import Students, SearchRecord
 
@@ -15,3 +17,9 @@ class SearchRecordSerializer(serializers.ModelSerializer):
     class Meta:
         model = SearchRecord
         fields = ['id', 'search_image_path', 'scan_id', 'student', 'student_name', 'created_at']
+
+
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'email']
