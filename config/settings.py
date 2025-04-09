@@ -24,8 +24,7 @@ SECRET_KEY = 'django-insecure-&m1s7bdg3=giy2$0-d5q!nz)lbnor-&e8-eusj(k+y#8+em+4r
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ["*"]   
-
+ALLOWED_HOSTS = ['*']
 # Application definition
 
 INSTALLED_APPS = [
@@ -39,7 +38,6 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
 
     'student_api',
-    'jazzmin',
     'corsheaders',
 
 
@@ -78,9 +76,7 @@ MIDDLEWARE = [
 ]
 
 CORS_ALLOWED_ORIGINS = [
-     "http://127.0.0.1:4000",
-    "http://localhost:4000",
-    "https://yourdomain.com",
+"http://127.0.0.1:8000",
 ]
 
 CORS_ALLOW_ALL_ORIGINS = True
