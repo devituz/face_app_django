@@ -165,7 +165,7 @@ def search_image(request):
                 "name": student.name,
                 "identifier": student.identifier,
                 "scan_id": scan_id,
-                "file": file_url,
+                # "file": file_url,
                 "created_at": created_at_uz,  # ✅ O‘zbekiston vaqti bo‘yicha qaytariladi
             })
 
