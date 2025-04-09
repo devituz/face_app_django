@@ -1,4 +1,13 @@
 import os
+from django.conf import settings
+from rest_framework.pagination import PageNumberPagination
+from rest_framework.response import Response
+from rest_framework import status
+from student_api.models import Students, SearchRecord
+import face_recognition
+from rest_framework.decorators import api_view
+
+import os
 from django.db.models import Q
 from django.http import JsonResponse
 from rest_framework import status
@@ -6,18 +15,15 @@ from rest_framework.decorators import api_view
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from django.conf import settings
-from .models import Students, SearchRecord
 import face_recognition
-from PIL import Image, ExifTags
-import time
-from .serializers import StudentsSerializer, SearchRecordSerializer
-from django.utils.timezone import localtime
 import pytz
-import json
 from datetime import datetime
 
+from student_api.serializers import StudentsSerializer
+
+
 @api_view(['POST'])
-def upload_image(request):
+def create_candidate(request):
     name = request.data.get('name')
     identifier = request.data.get('identifier')  # Foydalanuvchi kiritgan ID
     image_url = request.FILES.get('image_url')
@@ -63,8 +69,9 @@ def upload_image(request):
     })
 
 
+
 @api_view(['POST'])
-def update_image(request, id):
+def update_candidate(request, id):
     name = request.data.get('name')
     image_url = request.FILES.get('image_url')
 
@@ -107,83 +114,12 @@ def update_image(request, id):
     return Response({"message": "Ma'lumotlar yangilandi", "student_id": existing_image.id})
 
 
-
-@api_view(['POST'])
-def search_image(request):
-    file = request.FILES.get('file')
-    scan_id = request.data.get('scan_id')
-    search_folder = os.path.join(settings.MEDIA_ROOT, 'searches')
-    os.makedirs(search_folder, exist_ok=True)
-    file_location = os.path.join(search_folder, file.name)
-
-    with open(file_location, "wb") as buffer:
-        for chunk in file.chunks():
-            buffer.write(chunk)
-
-    image = Image.open(file_location)
-    try:
-        exif = image._getexif()
-        if exif is not None:
-            for tag, value in exif.items():
-                if tag == 274:  # Orientation tag
-                    if value == 3:
-                        image = image.rotate(180, expand=True)
-                    elif value == 6:
-                        image = image.rotate(270, expand=True)
-                    elif value == 8:
-                        image = image.rotate(90, expand=True)
-        image.save(file_location)
-    except (AttributeError, KeyError, IndexError):
-        pass
-
-    search_image = face_recognition.load_image_file(file_location)
-    search_face_encodings = face_recognition.face_encodings(search_image)
-
-    if len(search_face_encodings) == 0:
-        return Response({"detail": "Siz yuborgan rasmda inson yuzi mavjud emas"}, status=status.HTTP_400_BAD_REQUEST)
-
-    search_face_encoding = search_face_encodings[0]
-    students = Students.objects.all()
-
-    for student in students:
-        match = face_recognition.compare_faces([student.face_encoding], search_face_encoding, tolerance=0.4)
-        if match[0]:
-            student.scan_id = scan_id
-            student.save()
-
-            # SearchRecord obyektini yaratamiz va o‘zgaruvchiga saqlaymiz
-            search_record = SearchRecord.objects.create(
-                search_image_path=file_location,
-                student_id=student.id,
-                scan_id=scan_id
-            )
-
-            file_name = student.image_path.split("/")[-1]
-            file_url = request.build_absolute_uri(f"{settings.MEDIA_URL}students/{file_name}")
-            created_at_uz = localtime(search_record.created_at).strftime("%Y-%m-%d %H:%M:%S")
-
-
-            return Response({
-                "message": "Yuz topildi",
-                "id": student.id,
-                "name": student.name,
-                "identifier": student.identifier,
-                "scan_id": scan_id,
-                "file": file_url,
-                "created_at": created_at_uz,  # ✅ O‘zbekiston vaqti bo‘yicha qaytariladi
-            })
-
-    return Response({
-        "detail": "Siz yuborgan rasmda inson yuzilari bilan mos kelmadi",
-    })
-
-
 class StudentsPagination(PageNumberPagination):
     page_size = 10  # Har bir sahifada 9 ta foydalanuvchi
 
 
 @api_view(['GET'])
-def get_user_images(request):
+def get_candidate(request):
     # `created_at` bo‘yicha eng so‘nggilari birinchi chiqishi uchun saralash
     students = Students.objects.all().order_by('-created_at')
 
@@ -217,9 +153,8 @@ def get_user_images(request):
     return Response({"students": serializer.data})
 
 
-
 @api_view(['GET'])
-def get_user_json(request):
+def get_candidate_json(request):
     students = Students.objects.all()
     serializer = StudentsSerializer(students, many=True)
 
@@ -250,45 +185,57 @@ def get_user_json(request):
 
 
 @api_view(['GET'])
-def search_user_json(request):
+def search_candidate_json(request):
     query = request.GET.get('query', '').strip()
 
     if not query:
-        return Response({})  # Agar query bo'sh bo'lsa, bo'sh obyekt qaytariladi
+        return Response([])
 
-    student = Students.objects.filter(
+    # `query` ga mos keladigan barcha studentlarni olish
+    students = Students.objects.filter(
         Q(name__icontains=query) | Q(identifier__icontains=query)
-    ).first()  # Faqat bitta natija qaytariladi
+    )
 
-    if not student:
-        return Response({})  # Agar topilmasa, bo'sh obyekt qaytariladi
+    if not students.exists():
+        return Response([])  # Agar hech narsa topilmasa, bo'sh ro'yxat qaytariladi
 
-    serializer = StudentsSerializer(student)
-    student_data = serializer.data
+    serializer = StudentsSerializer(students, many=True)  # Ko'p obyektni serialize qilish
+    students_data = serializer.data
 
-    # Fayl URL'ini to'g'ri shaklga keltirish
-    file_name = student_data['image_path'].split("/")[-1]
-    student_data['image_url'] = request.build_absolute_uri(f"{settings.MEDIA_URL}students/{file_name}")
-
-    # image_path ni olib tashlash
-    del student_data['image_path']
-
-    # `created_at`ni O‘zbekiston vaqtiga aylantirish
+    # Ma'lumotlarni qayta ishlash
     uzbekistan_tz = pytz.timezone("Asia/Tashkent")
-    if 'created_at' in student_data:
-        try:
-            utc_time = datetime.fromisoformat(student_data['created_at'])
-            local_time = utc_time.astimezone(uzbekistan_tz)
-            student_data['created_at'] = local_time.strftime("%b %d, %Y %H:%M:%S")
-        except ValueError:
-            pass
 
-    return Response(student_data)
+    for student in students_data:
+        # Fayl URL'ini to'g'ri shaklga keltirish
+        file_name = student['image_path'].split("/")[-1]
+        student['image_url'] = request.build_absolute_uri(f"{settings.MEDIA_URL}students/{file_name}")
+
+        # image_path ni olib tashlash
+        del student['image_path']
+
+        # `created_at` ni O‘zbekiston vaqtiga o'zgartirish
+        if 'created_at' in student:
+            try:
+                utc_time = datetime.fromisoformat(student['created_at'])
+                local_time = utc_time.astimezone(uzbekistan_tz)
+                student['created_at'] = local_time.strftime("%b %d, %Y %H:%M:%S")
+            except ValueError:
+                pass
+
+    return Response(students_data)
 
 
-def allsearch(request):
-    # SearchRecord dan barcha yozuvlarni olish va created_at bo‘yicha teskari saralash
-    search_records = SearchRecord.objects.select_related('student').order_by('-created_at')
+def get_search(request):
+    query = request.GET.get('query', None)  # 'query' parametrini olish
+
+    # Agar query bo'lsa, faqat o'sha so'rovlar bilan ishlaymiz
+    if query:
+        search_records = SearchRecord.objects.select_related('student').filter(
+            student__name__icontains=query  # 'name' bo'yicha qidiruv
+        ).order_by('-created_at')
+    else:
+        # Agar query bo'lmasa, barcha yozuvlarni olish
+        search_records = SearchRecord.objects.select_related('student').order_by('-created_at')
 
     # JSON formatiga moslashtirish
     data = []
@@ -322,54 +269,7 @@ def allsearch(request):
 
 
 @api_view(['POST'])
-def getme_register(request):
-    scan_id = request.data.get('scan_id')
-
-    # scan_id bo‘yicha SearchRecordlarni olish, id bo‘yicha kamayish tartibida saralash
-    search_records = SearchRecord.objects.filter(scan_id=scan_id).order_by('-id')
-
-    if not search_records.exists():
-        return Response({"detail": "Ushbu scan_id uchun yozuv topilmadi"}, status=status.HTTP_404_NOT_FOUND)
-
-    result = []
-
-    for record in search_records:
-        student = record.student
-
-        # Student image URL
-        student_image_path = None
-        if student and student.image_path:
-            student_image_name = student.image_path.split("/")[-1]
-            student_image_path = request.build_absolute_uri(f"{settings.MEDIA_URL}students/{student_image_name}")
-
-        # Search image URL
-        search_image_url = None
-        if record.search_image_path:
-            search_file_name = record.search_image_path.split("/")[-1]
-            search_image_url = request.build_absolute_uri(f"{settings.MEDIA_URL}searches/{search_file_name}")
-
-        serialized_record = SearchRecordSerializer(record).data
-
-        # student_image listini hosil qilish
-        student_images = [student_image_path,search_image_url]
-        student_images = [img for img in student_images if img]  # None bo'lganlarini olib tashlaymiz
-
-        # search_image_path ni olib tashlab, student_image ni qo'shamiz
-        filtered_record = {key: value for key, value in serialized_record.items() if key != "search_image_path"}
-
-        result.append({
-            **filtered_record,
-            "student_name": student.name if student else "Noma'lum",
-            "student_image": student_images,  # Bitta list sifatida qaytarish
-            "identifier": record.student.identifier if record.student else None,
-
-        })
-
-    return Response({"results": result})
-
-
-@api_view(['POST'])
-def delete_records_by_id(request):
+def delete_by_id(request):
     # Yuborilgan id larni olish
     record_ids = request.data.get('ids', [])
 
@@ -394,7 +294,7 @@ def delete_records_by_id(request):
 
 
 @api_view(['POST'])
-def delete_candidate_records(request):
+def delete_search_candidate(request):
     # 'ids' ni olish
     ids = request.data.get('ids', [])
 
@@ -412,6 +312,3 @@ def delete_candidate_records(request):
     # O'chirish jarayoni
     students_to_delete.delete()
     return Response({"message": f"{deleted_count} ta kandidat muvaffaqiyatli o'chirildi"})
-
-
-
