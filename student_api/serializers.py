@@ -19,7 +19,3 @@ class SearchRecordSerializer(serializers.ModelSerializer):
         fields = ['id', 'search_image_path', 'scan_id', 'student', 'student_name', 'created_at']
 
 
-class UserSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = User
-        fields = ['id', 'username', 'email']
