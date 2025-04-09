@@ -15,6 +15,8 @@ from django.utils.timezone import localtime
 import pytz
 import json
 from datetime import datetime
+from django.core.exceptions import ObjectDoesNotExist
+
 
 @api_view(['POST'])
 def upload_image(request):
@@ -334,7 +336,11 @@ def getme_register(request):
     result = []
 
     for record in search_records:
-        student = record.student
+        student = None
+        try:
+            student = record.student
+        except ObjectDoesNotExist:
+            student = None  # If student does not exist, set it to None
 
         # Student image URL
         student_image_path = None
@@ -351,18 +357,17 @@ def getme_register(request):
         serialized_record = SearchRecordSerializer(record).data
 
         # student_image listini hosil qilish
-        student_images = [student_image_path,search_image_url]
-        student_images = [img for img in student_images if img]  # None bo'lganlarini olib tashlaymiz
+        student_images = [student_image_path, search_image_url]
+        student_images = [img for img in student_images if img]  # Remove None values
 
         # search_image_path ni olib tashlab, student_image ni qo'shamiz
         filtered_record = {key: value for key, value in serialized_record.items() if key != "search_image_path"}
 
         result.append({
             **filtered_record,
-            "student_name": student.name if student else "Noma'lum",
-            "student_image": student_images,  # Bitta list sifatida qaytarish
-            "identifier": record.student.identifier if record.student else None,
-
+            "student_name": student.name if student else "Noma'lum",  # Default name if no student found
+            "student_image": student_images,  # Return images list
+            "identifier": student.identifier if student else None,  # Default to None if no student found
         })
 
     return Response({"results": result})
