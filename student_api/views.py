@@ -142,7 +142,7 @@ def search_image(request):
     students = Students.objects.all()
 
     for student in students:
-        match = face_recognition.compare_faces([student.face_encoding], search_face_encoding, tolerance=0.4)
+        match = face_recognition.compare_faces([student.face_encoding], search_face_encoding, tolerance=0.3)
         if match[0]:
             student.scan_id = scan_id
             student.save()
