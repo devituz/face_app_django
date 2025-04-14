@@ -16,7 +16,7 @@ class Students(models.Model):
 
 
 class SearchRecord(models.Model):
-    search_image_path = models.CharField(max_length=255)
+    search_image_path = models.CharField(max_length=255, null=True, blank=True)
     scan_id = models.CharField(max_length=255, null=True, blank=True)
     student = models.ForeignKey(Students, on_delete=models.CASCADE, related_name='search_records', null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
