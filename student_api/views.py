@@ -104,35 +104,49 @@ def update_image(request, id):
     return Response({"message": "Ma'lumotlar yangilandi", "student_id": existing_image.id})
 
 
+
+
 @api_view(['POST'])
 def search_image(request):
     file = request.FILES.get('file')
     scan_id = request.data.get('scan_id')
-    search_folder = os.path.join(settings.MEDIA_ROOT, 'searches')
-    os.makedirs(search_folder, exist_ok=True)
-    file_location = os.path.join(search_folder, file.name)
 
-    with open(file_location, "wb") as buffer:
-        for chunk in file.chunks():
-            buffer.write(chunk)
+    if not file or not scan_id:
+        return Response({"detail": "Fayl yoki scan_id yuborilmadi"}, status=status.HTTP_400_BAD_REQUEST)
 
-    image = Image.open(file_location)
+    # --- Faylni diskka saqlashni vaqtinchalik o'chirib turamiz ---
+    # search_folder = os.path.join(settings.MEDIA_ROOT, 'searches')
+    # os.makedirs(search_folder, exist_ok=True)
+    # file_location = os.path.join(search_folder, file.name)
+    #
+    # with open(file_location, "wb") as buffer:
+    #     for chunk in file.chunks():
+    #         buffer.write(chunk)
+
+    # Rasmni xotirada ochamiz
+    image = Image.open(file)
+
     try:
         exif = image._getexif()
         if exif is not None:
-            for tag, value in exif.items():
-                if tag == 274:  # Orientation tag
-                    if value == 3:
-                        image = image.rotate(180, expand=True)
-                    elif value == 6:
-                        image = image.rotate(270, expand=True)
-                    elif value == 8:
-                        image = image.rotate(90, expand=True)
-        image.save(file_location)
-    except (AttributeError, KeyError, IndexError):
+            orientation_tag = 274
+            orientation = exif.get(orientation_tag)
+            if orientation == 3:
+                image = image.rotate(180, expand=True)
+            elif orientation == 6:
+                image = image.rotate(270, expand=True)
+            elif orientation == 8:
+                image = image.rotate(90, expand=True)
+    except Exception:
         pass
 
-    search_image = face_recognition.load_image_file(file_location)
+    # Rasmni xotirada saqlaymiz (diskka emas)
+    image_stream = io.BytesIO()
+    image.save(image_stream, format='JPEG')
+    image_stream.seek(0)
+
+    # Face recognition uchun rasmni xotiradan yuklaymiz
+    search_image = face_recognition.load_image_file(image_stream)
     search_face_encodings = face_recognition.face_encodings(search_image)
 
     if len(search_face_encodings) == 0:
@@ -147,17 +161,13 @@ def search_image(request):
             student.scan_id = scan_id
             student.save()
 
-            # SearchRecord obyektini yaratamiz va o‘zgaruvchiga saqlaymiz
             search_record = SearchRecord.objects.create(
-                search_image_path=file_location,
+                search_image_path=None,  # --- Rasm manzili vaqtinchalik yo‘q ---
                 student_id=student.id,
                 scan_id=scan_id
             )
 
-            file_name = student.image_path.split("/")[-1]
-            file_url = request.build_absolute_uri(f"{settings.MEDIA_URL}students/{file_name}")
             created_at_uz = localtime(search_record.created_at).strftime("%Y-%m-%d %H:%M:%S")
-
 
             return Response({
                 "message": "Yuz topildi",
@@ -165,10 +175,10 @@ def search_image(request):
                 "name": student.name,
                 "identifier": student.identifier,
                 "scan_id": scan_id,
-                # "file": file_url,
-                "created_at": created_at_uz,  # ✅ O‘zbekiston vaqti bo‘yicha qaytariladi
+                "created_at": created_at_uz,
             })
 
     return Response({
         "detail": "Siz yuborgan rasmda inson yuzilari bilan mos kelmadi",
     })
+
